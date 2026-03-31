@@ -261,6 +261,66 @@ namespace Il2Cpp {
         export type Apply = (method: Il2Cpp.Method, state: Il2Cpp.Tracer.State, threadId: number) => void;
     }
 
+    function formatTraceValue(value: NativeCallbackArgumentValue | NativeFunctionReturnValue, type: Il2Cpp.Type): string {
+        try {
+            return formatTraceConvertedValue(fromFridaValue(value, type), type);
+        } catch (_) {
+            return `<${type.name} @ ${formatTraceRawValue(value)}>`;
+        }
+    }
+
+    function formatTraceConvertedValue(value: Il2Cpp.Parameter.Type | Il2Cpp.Method.ReturnType, type: Il2Cpp.Type): string {
+        if (value == null) {
+            return "null";
+        }
+
+        if (value instanceof NativePointer) {
+            return formatTraceRawValue(value);
+        }
+
+        if (value instanceof Il2Cpp.Reference) {
+            return `<ref ${type.name} @ ${formatTraceRawValue(value.handle)}>`;
+        }
+
+        if (value instanceof Il2Cpp.Pointer) {
+            return `<pointer ${type.name} @ ${formatTraceRawValue(value.handle)}>`;
+        }
+
+        if (value instanceof Il2Cpp.String) {
+            if (value.isNull()) {
+                return "null";
+            }
+
+            try {
+                return JSON.stringify(value.content);
+            } catch (_) {
+                return `<string @ ${formatTraceRawValue(value.handle)}>`;
+            }
+        }
+
+        if (value instanceof Il2Cpp.Array) {
+            return value.isNull() ? "null" : `<${type.name} @ ${formatTraceRawValue(value.handle)}>`;
+        }
+
+        if (value instanceof Il2Cpp.Object) {
+            return value.isNull() ? "null" : `<${type.name} @ ${formatTraceRawValue(value.handle)}>`;
+        }
+
+        if (value instanceof Il2Cpp.ValueType) {
+            return value.isNull() ? "null" : `<${type.name}>`;
+        }
+
+        return `${value}`;
+    }
+
+    function formatTraceRawValue(value: NativeCallbackArgumentValue | NativeFunctionReturnValue): string {
+        if (globalThis.Array.isArray(value)) {
+            return `[${value.map(_ => formatTraceRawValue(_)).join(", ")}]`;
+        }
+
+        return `${value}`;
+    }
+
     /** */
     export function trace(parameters: boolean = false): Il2Cpp.Tracer.Configure {
         const applier = (): Il2Cpp.Tracer.Apply => (method, state, threadId) => {
@@ -294,14 +354,14 @@ namespace Il2Cpp {
                     const parameters = thisParameter ? [thisParameter].concat(method.parameters) : method.parameters;
 
                     // prettier-ignore
-                    state.buffer.push(`\x1b[2m0x${paddedVirtualAddress}\x1b[0m ${`│ `.repeat(state.depth++)}┌─\x1b[35m${method.class.type.name}::\x1b[1m${method.name}\x1b[0m\x1b[0m(${parameters.map(e => `\x1b[32m${e.name}\x1b[0m = \x1b[31m${fromFridaValue(args[e.position + startIndex], e.type)}\x1b[0m`).join(", ")})`);
+                    state.buffer.push(`\x1b[2m0x${paddedVirtualAddress}\x1b[0m ${`│ `.repeat(state.depth++)}┌─\x1b[35m${method.class.type.name}::\x1b[1m${method.name}\x1b[0m\x1b[0m(${parameters.map(e => `\x1b[32m${e.name}\x1b[0m = \x1b[31m${formatTraceValue(args[e.position + startIndex], e.type)}\x1b[0m`).join(", ")})`);
                 }
 
                 const returnValue = method.nativeFunction(...args);
 
                 if ((this as InvocationContext).threadId == threadId) {
                     // prettier-ignore
-                    state.buffer.push(`\x1b[2m0x${paddedVirtualAddress}\x1b[0m ${`│ `.repeat(--state.depth)}└─\x1b[33m${method.class.type.name}::\x1b[1m${method.name}\x1b[0m\x1b[0m${returnValue == undefined ? "" : ` = \x1b[36m${fromFridaValue(returnValue, method.returnType)}`}\x1b[0m`);
+                    state.buffer.push(`\x1b[2m0x${paddedVirtualAddress}\x1b[0m ${`│ `.repeat(--state.depth)}└─\x1b[33m${method.class.type.name}::\x1b[1m${method.name}\x1b[0m\x1b[0m${returnValue == undefined ? "" : ` = \x1b[36m${formatTraceValue(returnValue, method.returnType)}`}\x1b[0m`);
                     state.flush();
                 }
 
