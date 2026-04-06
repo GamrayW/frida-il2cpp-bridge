@@ -25,7 +25,7 @@ namespace Il2Cpp {
         };
 
         /** @internal */
-        #threadId: number = Il2Cpp.mainThread.id;
+        #threadId: number | undefined = undefined;
 
         /** @internal */
         #verbose: boolean = false;
@@ -220,10 +220,11 @@ namespace Il2Cpp {
 
         /** Starts tracing. */
         attach(): void {
+            const threadId = this.#threadId ?? 0;
             for (const target of this.#targets) {
                 if (!target.virtualAddress.isNull()) {
                     try {
-                        this.#applier(target, this.#state, this.#threadId);
+                        this.#applier(target, this.#state, threadId);
                     } catch (e: any) {
                         switch (e.message) {
                             case /unable to intercept function at \w+; please file a bug/.exec(e.message)?.input:
@@ -328,13 +329,13 @@ namespace Il2Cpp {
 
             Interceptor.attach(method.virtualAddress, {
                 onEnter() {
-                    if (this.threadId == threadId) {
+                    if (threadId === 0 || this.threadId == threadId) {
                         // prettier-ignore
                         state.buffer.push(`\x1b[2m0x${paddedVirtualAddress}\x1b[0m ${`│ `.repeat(state.depth++)}┌─\x1b[35m${method.class.type.name}::\x1b[1m${method.name}\x1b[0m\x1b[0m`);
                     }
                 },
                 onLeave() {
-                    if (this.threadId == threadId) {
+                    if (threadId === 0 || this.threadId == threadId) {
                         // prettier-ignore
                         state.buffer.push(`\x1b[2m0x${paddedVirtualAddress}\x1b[0m ${`│ `.repeat(--state.depth)}└─\x1b[33m${method.class.type.name}::\x1b[1m${method.name}\x1b[0m\x1b[0m`);
                         state.flush();

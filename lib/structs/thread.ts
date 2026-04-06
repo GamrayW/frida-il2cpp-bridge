@@ -141,7 +141,12 @@ namespace Il2Cpp {
 
             for (const range of Process.enumerateRanges("rw-")) {
                 if (range.file == undefined) {
-                    const matches = Memory.scanSync(range.base, range.size, pattern);
+                    let matches: MemoryScanMatch[];
+                    try {
+                        matches = Memory.scanSync(range.base, range.size, pattern);
+                    } catch (_) {
+                        continue;
+                    }
                     if (matches.length == 1) {
                         while (true) {
                             const handle = matches[0].address.sub(matches[0].size * threads.length).readPointer();
